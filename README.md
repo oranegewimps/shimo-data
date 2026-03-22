@@ -44,5 +44,5 @@
 
 ### Contact
 
-- Zenn: https://zenn.dev/shimo_data
+- Zenn: https://zenn.dev/shimodata
 - X: https://x.com/shimo_data
