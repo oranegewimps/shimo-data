@@ -11,7 +11,7 @@
 ### Skills
 
 **Data Modeling**
-- dbt（学習中）
+- dbt
 - DuckDB
 - Google BigQuery
 
