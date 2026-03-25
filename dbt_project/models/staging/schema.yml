@@ -1,0 +1,26 @@
+version: 2
+
+models:
+  - name: stg_sales
+    description: "売上生データの整形モデル"
+    columns:
+      - name: order_id
+        description: "注文ID"
+        tests:
+          - unique
+          - not_null
+      - name: order_date
+        description: "注文日"
+        tests:
+          - not_null
+      - name: amount
+        description: "売上金額"
+        tests:
+          - not_null
+      - name: product
+        description: "商品名"
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["コンサルティング", "BIダッシュボード構築", "データ分析支援"]
