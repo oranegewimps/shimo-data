@@ -1,0 +1,4 @@
+sales_rep_id,sales_rep_name,team,target_amount
+REP001,田中太郎,西日本チーム,3000000
+REP002,鈴木花子,東日本チーム,2500000
+REP003,佐藤次郎,東日本チーム,2800000
