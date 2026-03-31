@@ -35,7 +35,7 @@ select
     end                                             as is_won,
     case
         when closed_date is not null then
-            datediff('day', created_date, closed_date)
+            date_diff(cast(closed_date as date), cast(created_date as date), DAY)
         else null
     end                                             as lead_time_days
 from cleaned

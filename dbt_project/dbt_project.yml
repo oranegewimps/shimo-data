@@ -18,8 +18,8 @@ seeds:
   dbt_project:
     raw_deals:
       +column_types:
-        closed_date: varchar
-        created_date: varchar
+        closed_date: string
+        created_date: string
 
 models:
   dbt_project:

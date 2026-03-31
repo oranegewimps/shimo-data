@@ -13,7 +13,7 @@ select
     r.target_amount,
     count(d.deal_id)                                                    as total_deals,
     sum(d.is_won)                                                       as won_deals,
-    sum(case when d.result = cast('失注' as varchar) then 1 else 0 end) as lost_deals,
+    sum(case when d.result = '失注' then 1 else 0 end)                  as lost_deals,
     sum(case when d.result is null then 1 else 0 end)                   as active_deals,
     sum(case when d.is_won = 1 then d.amount else 0 end)                as won_amount,
     round(avg(case when d.is_won = 1 then d.lead_time_days end), 1)     as avg_lead_time_days,
