@@ -1,0 +1,28 @@
+name: 'olist_portfolio'
+version: '1.0.0'
+config-version: 2
+
+profile: 'olist_portfolio'
+
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+models:
+  olist_portfolio:
+    staging:
+      +materialized: view
+      +schema: olist_staging
+    intermediate:
+      +materialized: view
+      +schema: olist_intermediate
+    marts:
+      +materialized: table
+      +schema: olist_marts

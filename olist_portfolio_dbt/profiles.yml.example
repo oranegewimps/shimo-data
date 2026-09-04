@@ -1,0 +1,16 @@
+# このファイルは ~/.dbt/profiles.yml としてローカルに配置してください
+# (リポジトリ直下に置く場合は必ず .gitignore に profiles.yml を追加すること)
+#
+# method: oauth を使う場合は事前に以下を実行しておく:
+#   gcloud auth application-default login
+
+olist_portfolio:
+  target: dev
+  outputs:
+    dev:
+      type: bigquery
+      method: oauth
+      project: olist-ecommerce-shimodata
+      dataset: dbt_default   # 実際には使われず、各モデルは models: 設定の +schema (olist_staging等)で決まるデータセットに作られる
+      location: US
+      threads: 4

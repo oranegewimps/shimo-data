@@ -1,0 +1,40 @@
+version: 2
+
+models:
+  - name: mart_monthly_sales
+    description: >
+      月次のGMV・注文件数・AOV・購入顧客数の推移。
+      Looker Studio: ①現状把握「売上・成長トレンド」パートで使用。
+    columns:
+      - name: order_month
+        tests:
+          - not_null
+
+  - name: mart_delivery_by_state
+    description: >
+      州(customer_state)別の配送遅延率・平均レビュースコア・代表緯度経度。
+      Looker Studio: ①現状把握「地理・オペレーション品質」パートで使用(地図チャート想定)。
+    columns:
+      - name: state
+        tests:
+          - unique
+          - not_null
+
+  - name: mart_review_score_distribution
+    description: >
+      レビュースコア(1〜5)の件数・構成比。
+      Looker Studio: ①現状把握「レビュースコア分布」パートで使用。
+    columns:
+      - name: review_score
+        tests:
+          - unique
+          - not_null
+
+  - name: mart_category_sales
+    description: >
+      商品カテゴリ(英語名)別のGMV・注文件数・構成比。
+      Looker Studio: ①現状把握「カテゴリ別売上構成」パート(補助)で使用。
+    columns:
+      - name: category
+        tests:
+          - not_null
