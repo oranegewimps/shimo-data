@@ -87,12 +87,11 @@ models:
 
   - name: stg_geolocation
     description: >
-      郵便番号(先頭5桁)ごとの代表緯度経度。生データの重複を zip_code_prefix 単位で
-      平均集約して正規化している。
+      郵便番号別緯度経度の生データをそのまま通すステージング。
+      粒度は生データのまま維持し、集約処理は int_geolocation で行う。
     columns:
       - name: zip_code_prefix
         tests:
-          - unique
           - not_null
 
   - name: stg_product_category_translation

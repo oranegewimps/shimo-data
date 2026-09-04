@@ -29,7 +29,7 @@ customers as (
 
 geo as (
 
-    select * from {{ ref('stg_geolocation') }}
+    select * from {{ ref('int_geolocation') }}
 
 ),
 

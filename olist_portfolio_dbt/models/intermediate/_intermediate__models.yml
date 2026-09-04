@@ -18,3 +18,13 @@ models:
         tests:
           - unique
           - not_null
+
+  - name: int_geolocation
+    description: >
+      stg_geolocation を zip_code_prefix 単位で集約し、1zip1行に正規化したテーブル。
+      緯度経度は同一zipの複数レコードを平均化する。mart_delivery_by_state で使用。
+    columns:
+      - name: zip_code_prefix
+        tests:
+          - unique
+          - not_null
