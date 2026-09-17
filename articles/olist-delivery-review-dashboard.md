@@ -8,54 +8,78 @@ published: true
 
 ## はじめに
 
-転職ポートフォリオとして、ブラジルのEコマースプラットフォーム **Olist** の公開データセットを使い、**配送遅延とレビュー品質の地理的分布**を分析するダッシュボードを構築しました。
+転職ポートフォリオとして、ブラジルの大手Eコマースプラットフォーム **Olist** の公開データセットを活用し、**「配送遅延がカスタマーレビュー品質（顧客満足度）に与える地理的・時系列的な影響」** を分析・可視化するデータパイプラインおよびBIダッシュボードを構築しました。
 
-本記事では、データ取り込みからBIダッシュボード公開までの技術的な設計・実装を解説します。
+本記事では、データ取り込みからdbtによるモデリング、Looker Studioでのダッシュボード構築に至る技術設計と、そこから得られたインサイトを解説します。
 
-**完成ダッシュボード**: https://datastudio.google.com/s/qw_toxEKwdg
+* **完成ダッシュボード**: [Looker Studio リンク](https://datastudio.google.com/s/qw_toxEKwdg)
+* **GitHubリポジトリ**: [oranegewimps/shimo-data](https://github.com/oranegewimps/shimo-data)
 
-**GitHubリポジトリ**: https://github.com/oranegewimps/shimo-data
+---
+
+## 全体アーキテクチャ
+
+本プロジェクトでは、拡張性と保守性を考慮し、モダンデータスタックの標準的な構成を採用しています。
+
+```mermaid
+flowchart LR
+    subgraph Storage["GCP / BigQuery"]
+        RAW[(olist_raw)]
+        STG[(dbt_staging)]
+        INT[(dbt_intermediate)]
+        MART[(dbt_marts)]
+    end
+
+    subgraph Process["Data Pipelines"]
+        CSV[Kaggle CSV] -->|bq load| RAW
+        RAW -->|dbt run| STG
+        STG --> INT
+        INT --> MART
+    end
+
+    subgraph Visualization["BI Tool"]
+        MART -->|Direct Query| LS[Looker Studio]
+    end
+```
 
 ---
 
 ## 技術スタック
 
-| レイヤー | ツール |
-|---------|--------|
-| データウェアハウス | BigQuery（GCP） |
-| データ変換 | dbt v1.11.7 + dbt-bigquery v1.11.1 |
-| BI・可視化 | Looker Studio |
-| 認証 | OAuth（dbt ↔ BigQuery） |
+| レイヤー | 採用ツール / ライブラリ | 選定理由・役割 |
+|---------|----------------------|-------------|
+| DWH | BigQuery (GCP) | 大規模データの高速集計、サーバーレスでの運用容易性 |
+| Data Transformation | dbt-bigquery (v1.11.1) / dbt-core (v1.11.7) | データモデリング、リポジトリ管理、データ品質テスト |
+| BI / 可視化 | Looker Studio | BigQueryとの親和性、インタラクティブなマップ描画 |
+| 認証・セキュリティ | OAuth 2.0 | 個人開発環境における安全なGCP認証基盤 |
 
 ---
 
 ## データセット概要
 
-[Olist Brazilian E-Commerce Dataset（Kaggle）](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce) を使用。
+- **データソース**: [Olist Brazilian E-Commerce Dataset (Kaggle)](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce)
+- **規模**: 約10万件の注文データ（2016年〜2018年）
+- **構造**: 注文、商品、顧客、販売者、レビュー、決済、配送などを含む関連9テーブル
 
-- 約10万件の注文データ（2016〜2018年）
-- 注文・商品・顧客・販売者・レビュー・配送情報を含む9テーブル
-- ブラジル全27州をカバー
-
-**分析テーマ**: 「配送遅延はどの州で多く、レビュースコアにどう影響するか」
+**分析テーマ**: 「配送遅延の地域的偏りと、それがレビュー評価（1〜5点）に与える定量的な影響の解明」
 
 ---
 
-## GCP構成
+## GCP / BigQuery環境構成
+
+BigQuery内ではデータ品質とライフサイクル管理を考慮し、データセットを段階的に分離しています。
 
 ```
-プロジェクト: olist-ecommerce-shimodata
-
-データセット:
-├── olist_raw                        # 生データ（CSV → bq load）
-├── dbt_default_olist_staging        # 型変換・リネーム
-├── dbt_default_olist_intermediate   # 集約・結合
-└── dbt_default_olist_marts          # BI用マート
+olist-ecommerce-shimodata (GCP Project)
+├── olist_raw                        # 生データ（CSVから直接ロード）
+├── dbt_default_olist_staging        # 型変換・カラム名正規化
+├── dbt_default_olist_intermediate   # テーブル結合・ビジネスロジック計算
+└── dbt_default_olist_marts          # BI用集計マート
 ```
 
-### データ取り込み
+### データロード (bq load)
 
-KaggleからダウンロードしたCSVを `bq load` コマンドでBigQueryに直接ロードしました。
+データ取り込みは、CLIツールを用いて再現性を確保した形で実行しました。
 
 ```bash
 bq load \
@@ -67,23 +91,23 @@ bq load \
 
 ---
 
-## dbtモデル設計
+## dbtによるデータモデリング設計
 
-### レイヤー構成
+dbtの設計思想に基づき、Staging → Intermediate → Marts の3レイヤー構成を採用し、関心の分離（SoC）を徹底しました。
 
 ```
-raw（BigQuery生テーブル）
- └── staging（型変換・リネームのみ）
-      └── intermediate（集約・結合）
-           └── marts（BI用マート）
+[olist_raw]
+    └── stg_orders / stg_customers / stg_order_reviews ... (Staging)
+             └── int_orders / int_geolocation (Intermediate)
+                      └── mart_delivery_by_state / mart_monthly_orders ... (Marts)
 ```
 
-### stagingレイヤー
+### 1. Staging レイヤー
 
-生データの型変換とカラム名の正規化のみを行います。ビジネスロジックは持ちません。
+役割: 生データの型変換、日時フォーマットのタイムスタンプ化、カラム名の統一（ビジネスロジックは一切含めない）。
 
 ```sql
--- stg_orders.sql
+-- models/staging/stg_orders.sql
 select
     order_id,
     customer_id,
@@ -94,12 +118,12 @@ select
 from {{ source('olist_raw', 'orders') }}
 ```
 
-### intermediateレイヤー
+### 2. Intermediate レイヤー
 
-複数テーブルの結合・集約を担当します。
+役割: 複数テーブルの結合、フラグ判定（配送遅延の有無など）のビジネスロジックの定義。
 
 ```sql
--- int_orders.sql（抜粋）
+-- models/intermediate/int_orders.sql
 select
     o.order_id,
     o.order_status,
@@ -117,13 +141,12 @@ left join {{ ref('stg_customers') }} c using (customer_id)
 where o.order_status = 'delivered'
 ```
 
-### martsレイヤー
+### 3. Marts レイヤー
 
-Looker Studio用の集計済みテーブルです。
-
-**mart_delivery_by_state**（州別配送分析）
+役割: BIツール（Looker Studio）に直接接続するための集約テーブル作成。
 
 ```sql
+-- models/marts/mart_delivery_by_state.sql
 select
     customer_state                              as state,
     count(order_id)                             as order_count,
@@ -136,90 +159,75 @@ left join {{ ref('int_geolocation') }} using (customer_state)
 group by customer_state
 ```
 
-**その他のmart**
-- `mart_monthly_orders` : 月次注文数・GMV
-- `mart_review_score_distribution` : レビュースコア分布
-- `mart_category_sales_top10` : カテゴリ別売上TOP10
+### データ品質管理 (dbt test)
 
-### dbt test
+プライマリキーの一意性・非空チェック、特定ドメイン値の許容テストを schema.yml に定義し、自動テストを導入しました。
 
 ```bash
 $ dbt test
 29 passed, 1 warned
 ```
 
-not_null・unique・accepted_valuesによる品質チェックを全モデルに設定しています。
+※ 1件の警告は、一部の古い注文データにおけるレビュー内容テキストの欠損に関するものであり、分析ロジック上許容されるケースであることを確認済み
 
 ---
 
-## Looker Studioダッシュボード設計
+## Looker Studio ダッシュボード設計
 
-### データソース構成（4本）
+### データソース設計
 
-| DS | テーブル | 主な用途 |
-|----|---------|---------|
-| DS-01 | mart_delivery_by_state | 地図・州別ランキング |
-| DS-02 | mart_monthly_orders | 月次トレンド |
-| DS-03 | mart_review_score_distribution | レビュー分布 |
-| DS-04 | mart_category_sales_top10 | カテゴリ別売上 |
+パフォーマンス確保のため、BigQuery側で集計済みのMartsテーブルをダイレクトに参照しています。
 
-### 計算フィールド
+| データソース名 | 参照マートテーブル | 主なダッシュボード用途 |
+|-------------|----------------|-------------------|
+| DS-01 | mart_delivery_by_state | Googleマップ表示、州別遅延率・スコアランキング |
+| DS-02 | mart_monthly_orders | 時系列トレンド（注文数・GMV） |
+| DS-03 | mart_review_score_distribution | レビュースコアの分布表示 |
+| DS-04 | mart_category_sales_top10 | カテゴリ別売上比較 |
 
-DS-01に以下の計算フィールドを追加しました。
+### BI用計算フィールドの定義
+
+Looker Studio側での適切な集計を保証するため、以下の計算フィールドを定義しました。
 
 ```
-全体遅延率 = SUM(late_order_count) / SUM(order_count)
-※ フィールドタイプ: パーセント
+・全体遅延率:
+  SUM(late_order_count) / SUM(order_count)  [形式: パーセント]
 
-加重平均レビュースコア = SUM(avg_review_score * order_count) / SUM(order_count)
+・加重平均レビュースコア:
+  SUM(avg_review_score * order_count) / SUM(order_count)
 
-location = CONCAT(state_lat, ",", state_lng)
-※ フィールドタイプ: 緯度、経度（Googleマップバブルチャート用）
+・マップ位置情報:
+  CONCAT(state_lat, ",", state_lng)  [形式: 緯度、経度]
 ```
 
-### チャート構成
+---
 
-| チャート | データソース | 主な設定 |
-|---------|------------|---------|
-| KPIスコアカード×4 | DS-01 | 遅延率=赤、レビュースコア=緑で条件付き書式 |
-| Googleマップ バブルチャート | DS-01 | バブルサイズ=注文件数、色=遅延率 |
-| 州別遅延率ランキング（横棒） | DS-01 | TOP10、最高値を赤でハイライト |
-| 月次注文数×GMVトレンド（コンボ） | DS-02 | 棒=注文数（右軸）、折れ線=GMV（左軸） |
-| レビュースコア分布（縦棒） | DS-03 | 1〜5を赤→緑のグラデーション |
-| カテゴリ別売上TOP10（横棒） | DS-04 | total_sales降順 |
+## 分析結果とビジネスインサイト
+
+### 1. 配送遅延の強い地域偏在性
+
+**発見**: アラゴアス州（AL）で遅延率24%と極めて高い値を記録したほか、北東部・北部地域で遅延率が高水準となりました。一方で、サンパウロ（SP）など南東部の都市部は非常に低い遅延率に抑えられています。
+
+**背景**: ブラジル国内の主要物流拠点・倉庫が南東部に偏在しており、広大な北部への長距離輸送におけるインフラボトルネックが浮き彫りになりました。
+
+### 2. 配送遅延と顧客満足度の負の相関
+
+全体平均のレビュースコアは **4.16 / 5.0** と好調である一方、遅延率が高い州ほど平均スコアが低下する傾向が明確に確認できました。顧客離脱を防ぐためには、遅延頻発地域における配送予定日の精度向上（または事前の期待値調整）が最優先課題であることがわかりました。
+
+### 3. 売上成長トレンドと季節性
+
+2016年末〜2018年にかけて注文数・GMVともに着実な拡大傾向を示しました。特に2017年11月はブラックフライデーキャンペーンの影響で急激なトラフィック増（月間売上ピーク）を記録しました。
 
 ---
 
-## 分析結果・インサイト
+## 実装における工夫とハマった点
 
-### 遅延率の地域差
+### 工夫した点：複数座標を持つ郵便番号の集約
 
-- **AL州（Alagoas）の遅延率が約24%**と最高。北東部・北部の州に遅延が集中
-- サンパウロ（SP）など南東部主要都市は比較的遅延率が低い
-- ブラジルの物流インフラが地域によって大きく異なることが可視化できた
-
-### 遅延とレビュースコアの関係
-
-- 加重平均レビュースコアは **4.16**（5点満点）と全体的には高水準
-- 遅延率の高い州ほどレビュースコアが低い傾向が確認できる
-
-### 成長トレンド
-
-- 2016年末〜2018年にかけてGMV・注文数ともに右肩上がり
-- 2017年11月にピーク（ブラックフライデー効果と推定）
-
----
-
-## 工夫した点・ハマった点
-
-### 工夫した点
-
-**int_geolocationでのzip_code_prefix単位集約**
-
-生データのgeolocationは同一zip_codeに複数のlat/lngが存在するため、`AVG()` で集約してから州レベルにまとめました。
+生データの geolocation テーブルでは、同一の zip_code_prefix に対して複数の緯度経度レコードが存在し、そのまま結合するとデータ増殖（ファンアウト）を引き起こす問題がありました。そのため、int_geolocation モデル内で一度 AVG() による代表値を算出し、データ整合性を担保しました。
 
 ```sql
--- int_geolocation.sql
+-- models/intermediate/int_geolocation.sql
 select
     zip_code_prefix,
     avg(geolocation_lat) as lat,
@@ -228,33 +236,34 @@ from {{ source('olist_raw', 'geolocation') }}
 group by zip_code_prefix
 ```
 
-**Looker Studioの緯度経度フィールド**
+### ハマった点：BIツール側での時系列集約バグ
 
-`CONCAT(lat, ",", lng)` で文字列を作成し、フィールドタイプを「緯度、経度」に変更することでGoogleマップが認識します。タイプ変更を忘れるとマップに表示されないので注意。
+Looker Studio上で集計済みの order_month（文字列/日付形式）を「年四半期」へ自動切り替えした際、BIツール側での重複再集計が発生し、グラフ表記が歪む問題に直面しました。
 
-### ハマった点
-
-**月次グラフの四半期集約問題**
-
-`order_month` を「年四半期」タイプに変更すると、すでに月次集計済みのテーブルと衝突して同一四半期が重複表示される問題が発生。月次データのまま表示し、X軸ラベルを3ヶ月間隔で間引くことで解決しました。
+**対応策**: データソース側での過度な自動集計に頼らず、X軸のラベル表示間隔をビジュアル設定で調整することで、データ精度を損なわずに見栄えを最適化しました。
 
 ---
 
-## まとめ
+## まとめと今後の展望
 
-| 項目 | 値 |
-|------|-----|
-| 総注文数 | 約9.6万件 |
-| 全体遅延率 | 8.1% |
+| 指標項目 | 分析結果 |
+|---------|---------|
+| データ分析対象総注文数 | 約96,000 件 |
+| 全体配送遅延率 | 8.1% |
 | 加重平均レビュースコア | 4.16 / 5.0 |
-| 対象州数 | 27州 |
+| カバー地域 | ブラジル全 27 州 |
 
-GCP + dbt + Looker Studioの組み合わせで、データ取り込みから可視化まで一貫したパイプラインを構築できました。dbtのレイヤー設計（staging → intermediate → marts）により、責務が明確で保守しやすい構成になっています。
+GCP + dbt + Looker Studio のモダンデータスタックを活用することで、**「生データからの自動モデリング → 品質テスト → BIツールでの意思決定支援」** に至る一貫したパイプラインを構築できました。
+
+### 今後の改善・拡張アプローチ (Next Actions)
+
+- **BigQueryコスト最適化**: 今後データ量が拡大した際に備え、`order_purchased_at` によるパーティショニングと、`customer_state` によるクラスタリングの導入。
+- **CI/CDの構築**: GitHub Actionsと dbt Cloud (または dbt-ci) を連携させ、プルリクエスト時の自動 dbt test パイプラインを構築すること。
 
 ---
 
-## 参考
+## 参考資料
 
 - [Olist Brazilian E-Commerce Dataset - Kaggle](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce)
-- [dbt ドキュメント](https://docs.getdbt.com/)
-- [BigQuery ドキュメント](https://cloud.google.com/bigquery/docs)
+- [dbt Documentation](https://docs.getdbt.com/)
+- [Google Cloud BigQuery Documentation](https://cloud.google.com/bigquery/docs)
