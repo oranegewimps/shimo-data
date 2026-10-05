@@ -42,7 +42,7 @@
 | 2 | DOMOからdbtへの移行 | DOMO / dbt / DuckDB | [Zenn](https://zenn.dev/shimodata/articles/domo-to-dbt-duckdb-migration) |
 | 3 | CRM・営業KPIダッシュボード | dbt / DuckDB / Looker Studio | [Zenn](https://zenn.dev/shimodata/articles/dbt-crm-kpi-dashboard-duckdb) / [Dashboard](https://lookerstudio.google.com/reporting/2472b7dc-1d2f-49db-be56-a3fa9279db57) |
 | 4 | dbt × BigQuery データ基盤構築 | dbt / BigQuery / Looker Studio | [Zenn](https://zenn.dev/shimodata/articles/dbt-bigquery-looker-studio-dashboard) / [Dashboard](https://lookerstudio.google.com/reporting/17053184-d0d6-4e43-a2a2-f3464c7577f1) |
-| 5 | 配送・レビュー品質分析ダッシュボード（Olist） | GCP / dbt / BigQuery / Looker Studio | [Zenn](https://zenn.dev/shimodata/articles/olist-delivery-review-dashboard) |
+| 5 | 配送・レビュー品質分析ダッシュボード（Olist） | GCP / dbt / BigQuery / Looker Studio | [Zenn](https://zenn.dev/shimodata/articles/olist-delivery-review-dashboard) / [Dashboard](https://datastudio.google.com/reporting/99ad877a-6e13-451d-8747-b5d62045eade) |
 | 6 | Excelによる売上の自動集計 | Excel | [Zenn](https://zenn.dev/shimodata/articles/excel-sales-auto-aggregation) |
 
 ---
