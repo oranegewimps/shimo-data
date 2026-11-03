@@ -161,3 +161,4 @@ if seen_name and settings.self_name:
 - 3分での切り詰めは再エンコードしないため、1秒ほどはみ出すことがあります。
 - Cloud Run へのデプロイ（署名付きURLでの直接アップロード、Secret Manager）は未着手です。
 - 国税庁 Web-API による登録番号の照合は実装しましたが、アプリケーションIDがないため未確認です。
+
