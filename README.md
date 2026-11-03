@@ -45,6 +45,7 @@
 | 5 | 配送・レビュー品質分析ダッシュボード（Olist） | GCP / dbt / BigQuery / Looker Studio | [Zenn](https://zenn.dev/shimodata/articles/olist-delivery-review-dashboard) / [Dashboard](https://datastudio.google.com/reporting/99ad877a-6e13-451d-8747-b5d62045eade) |
 | 6 | Excelによる売上の自動集計 | Excel | [Zenn](https://zenn.dev/shimodata/articles/excel-sales-auto-aggregation) |
 | 7 | 録画動画から装備一覧CSVを作るツール（Gemini API） | Python / Gemini API / ffmpeg / Flask | [Zenn](https://zenn.dev/shimodata/articles/gemini-video-charm-csv) / [GitHub](https://github.com/oranegewimps/charm_extractor) |
+| 8 | スマホ動画から領収書・名刺をCSVにするWebアプリ（Gemini API） | Python / Gemini API / FastAPI / ffmpeg | [Zenn](https://zenn.dev/shimodata/articles/gemini-video-receipt-csv) / [GitHub](https://github.com/oranegewimps/video-receipt-ocr) |
 
 ---
 
